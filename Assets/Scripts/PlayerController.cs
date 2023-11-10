@@ -28,14 +28,23 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float dashSpeed;
     [SerializeField] float dashDuration;
     [SerializeField] float minimumDashInterval;
-    
+
+    [SerializeField] float knockbackMultiplier;
+
 
 
     [Header("Other")]
 
+    float damageTaken = 0.0f;
+
     [SerializeField] Rigidbody2D rb;
     [SerializeField] Transform feetPoint;
     [SerializeField] float inputsMinima;
+
+    [SerializeField] Animator bottomAnimator;
+    [SerializeField] Animator UpAnimator;
+
+    [SerializeField] BoxCollider2D swordCollider;
 
 
     Vector2 movements;
@@ -49,14 +58,35 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         rb.gravityScale = jumpingGravity;
+        swordCollider.enabled = false;
     }
 
     private void Update()
     {
         RaycastHit2D hit = Physics2D.Raycast(feetPoint.position, Vector2.down, .1f);
 
+        float velX = rb.velocity.x;
+
+        bottomAnimator.SetFloat("Speed", Mathf.Abs(velX));
+
+        if(Mathf.Abs(velX) > 0f)
+        {
+            Vector3 newScale = new(velX > 0 ? 1f : -1f, 1f, 1f);
+            bottomAnimator.transform.localScale = newScale;
+        }
+
+        if(Mathf.Abs(movements.x) > inputsMinima && velX != 0)
+        {
+            Vector3 newScale = new(movements.x > 0 ? 1f : -1f, 1f, 1f);
+            UpAnimator.transform.localScale = newScale;
+        }
+            
+
         if(hit.collider != null)
         {
+            if(!jumping)
+                bottomAnimator.SetBool("StoppedJump", true);
+
             if(dashed && !dashing)
                 dashed = false;
 
@@ -102,10 +132,18 @@ public class PlayerController : MonoBehaviour
 
     }
 
+    public void TakeDamage(float damage, Vector2 direction)
+    {
+        damageTaken += damage;
+        rb.AddForce(direction * (10 + (1/10 * damageTaken) * knockbackMultiplier), ForceMode2D.Impulse);
+    }
+
     public void Jump(bool startJump)
     {
         if (dashing)
             return;
+
+
 
         if(startJump)
         {
@@ -114,6 +152,9 @@ public class PlayerController : MonoBehaviour
 
             if(!grounded)
                 currentDoubleJumpAmount++;
+
+            bottomAnimator.SetBool("StoppedJump", false);
+            bottomAnimator.Play("Jump", 0, 0);
 
             lastJump = Time.time;
             jumping = true;
@@ -145,6 +186,31 @@ public class PlayerController : MonoBehaviour
         
     }
 
+    public void SwordHit(Collider2D col)
+    {
+        PlayerController enemyController = col.GetComponentInParent<PlayerController>();
+
+        if (enemyController != null && enemyController != this)
+        {
+            enemyController.TakeDamage(10, (enemyController.transform.position - transform.position).normalized);
+        }
+    }
+
+    public void StartAttack()
+    {
+        swordCollider.enabled = true;
+    }
+
+    public void EndAttack()
+    {
+        swordCollider.enabled = false;
+    }
+
+    public void Forward()
+    {
+        UpAnimator.Play("ForwardAttack");
+    }
+
     public void OnMove(InputAction.CallbackContext ctx)
     {
         movements = ctx.ReadValue<Vector2>();
@@ -158,5 +224,10 @@ public class PlayerController : MonoBehaviour
     public void OnDash(InputAction.CallbackContext ctx)
     {
         Dash();
+    }
+
+    public void OnForward(InputAction.CallbackContext ctx)
+    {
+        Forward();
     }
 }
