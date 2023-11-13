@@ -31,13 +31,16 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] float knockbackMultiplier;
 
+    [SerializeField] float baseKnockback;
+    [SerializeField] float baseUpKnockback;
 
 
-    [Header("Other")]
 
-    float damageTaken = 0.0f;
+    [Header("Others")]
 
-    [SerializeField] Rigidbody2D rb;
+    
+
+    public Rigidbody2D rb;
     [SerializeField] Transform feetPoint;
     [SerializeField] float inputsMinima;
 
@@ -45,6 +48,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] Animator UpAnimator;
 
     [SerializeField] BoxCollider2D swordCollider;
+
+    float damageTaken = 0.0f;
 
 
     Vector2 movements;
@@ -54,6 +59,7 @@ public class PlayerController : MonoBehaviour
     float lastJump = -10;
 
     bool jumping;
+    bool hittedTargetOnAttack = false;
 
     private void Start()
     {
@@ -135,7 +141,8 @@ public class PlayerController : MonoBehaviour
     public void TakeDamage(float damage, Vector2 direction)
     {
         damageTaken += damage;
-        rb.AddForce(direction * (10 + (1/10 * damageTaken) * knockbackMultiplier), ForceMode2D.Impulse);
+        Debug.Log(direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * knockbackMultiplier));
+        rb.AddForce((direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * knockbackMultiplier)) + Vector2.up * baseUpKnockback, ForceMode2D.Impulse);
     }
 
     public void Jump(bool startJump)
@@ -188,10 +195,14 @@ public class PlayerController : MonoBehaviour
 
     public void SwordHit(Collider2D col)
     {
+        if (hittedTargetOnAttack)
+            return;
+
         PlayerController enemyController = col.GetComponentInParent<PlayerController>();
 
         if (enemyController != null && enemyController != this)
         {
+            hittedTargetOnAttack = true;
             enemyController.TakeDamage(10, (enemyController.transform.position - transform.position).normalized);
         }
     }
@@ -204,6 +215,7 @@ public class PlayerController : MonoBehaviour
     public void EndAttack()
     {
         swordCollider.enabled = false;
+        hittedTargetOnAttack = false;
     }
 
     public void Forward()
