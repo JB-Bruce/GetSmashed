@@ -1,9 +1,21 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
+    [System.Serializable]
+    public struct Attack
+    {
+        public AttackEnum AttackEnum;
+        public float damage;
+        public float knockback;
+        public float stunTime;
+        public float attackDelay;
+        public bool slowMovementsOnAttack;
+    }
+
     [Header("Movement Assignation")]
 
     [SerializeField] float maxSpeed;
@@ -41,6 +53,11 @@ public class PlayerController : MonoBehaviour
     
 
     public Rigidbody2D rb;
+
+    [SerializeField] List<Attack> attackList;
+
+    [SerializeField] LayerMask swordMask;
+
     [SerializeField] Transform feetPoint;
     [SerializeField] float inputsMinima;
 
@@ -48,6 +65,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] Animator UpAnimator;
 
     [SerializeField] BoxCollider2D swordCollider;
+
+    [SerializeField] Transform collidersParent;
 
     float damageTaken = 0.0f;
 
@@ -58,13 +77,28 @@ public class PlayerController : MonoBehaviour
 
     float lastJump = -10;
 
+    Attack currentAttack;
+
+    bool attacking;
+
     bool jumping;
-    bool hittedTargetOnAttack = false;
+    List<PlayerController> playersHitted = new();
+
+    bool isStunByAttack = false;
+    float currentAttackDelay = 0f;
+
+    bool isHit = false;
+    float hitTimer = 0f;
+
+    public PlayerPlatformeManager plat;
+
 
     private void Start()
     {
         rb.gravityScale = jumpingGravity;
         swordCollider.enabled = false;
+
+        PlayerManager.instance.AddPlayer(this);
     }
 
     private void Update()
@@ -75,22 +109,36 @@ public class PlayerController : MonoBehaviour
 
         bottomAnimator.SetFloat("Speed", Mathf.Abs(velX));
 
-        if(Mathf.Abs(velX) > 0f)
+        if(isHit)
         {
-            Vector3 newScale = new(velX > 0 ? 1f : -1f, 1f, 1f);
-            bottomAnimator.transform.localScale = newScale;
+            hitTimer -= Time.deltaTime;
+            if(hitTimer < 0f)
+                isHit = false;
         }
 
-        if(Mathf.Abs(movements.x) > inputsMinima && velX != 0)
+        if (isStunByAttack)
+        {
+            currentAttackDelay -= Time.deltaTime;
+            if(currentAttackDelay < 0f)
+                isStunByAttack = false;
+        }
+
+        /*if(Mathf.Abs(velX) > 0f)
+        {
+            Vector3 newScale = new(velX > 0 ? 1f : -1f, 1f, 1f);
+        }*/
+
+        if (Mathf.Abs(movements.x) > inputsMinima && velX != 0)
         {
             Vector3 newScale = new(movements.x > 0 ? 1f : -1f, 1f, 1f);
             UpAnimator.transform.localScale = newScale;
+            bottomAnimator.transform.localScale = newScale;
         }
             
 
         if(hit.collider != null)
         {
-            if(!jumping)
+            if(!grounded)
                 bottomAnimator.SetBool("StoppedJump", true);
 
             if(dashed && !dashing)
@@ -111,7 +159,30 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if(dashing)
+        if (isHit)
+        {
+            if(grounded)
+                rb.velocity = new(rb.velocity.x * horizontalDeceleration, rb.velocity.y);
+            return;
+        }
+        
+
+        if (movements.magnitude <= inputsMinima)
+        {
+            rb.velocity = new(rb.velocity.x * horizontalDeceleration, rb.velocity.y);
+        }
+
+
+        rb.velocity = new(rb.velocity.x, Mathf.Clamp(rb.velocity.y, -maxFallSpeed, maxFallSpeed));
+
+        if (isStunByAttack && currentAttack.slowMovementsOnAttack)
+        {
+            rb.velocity = new(rb.velocity.x * 0.95f, rb.velocity.y);
+            return;
+        }
+            
+
+        if (dashing)
         {
             rb.velocity = dashDirection * dashSpeed * Time.fixedDeltaTime;
             dashTimer += Time.fixedDeltaTime;
@@ -126,31 +197,38 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if(movements.magnitude > inputsMinima)
+        if(jumping && rb.velocity.y < 0f)
+        {
+            Jump(false);
+        }
+
+        if (movements.magnitude > inputsMinima)
         {
             rb.velocity = new(Mathf.Clamp(rb.velocity.x + movements.x * acceleration * Time.fixedDeltaTime, -maxSpeed, maxSpeed), rb.velocity.y);
         }
-        else
-        {
-            rb.velocity = new(rb.velocity.x * horizontalDeceleration, rb.velocity.y);
-        }
-        rb.velocity = new(rb.velocity.x, Mathf.Clamp(rb.velocity.y, -maxFallSpeed, maxFallSpeed));
 
     }
 
-    public void TakeDamage(float damage, Vector2 direction)
+
+    public void TakeDamage(float damage, Vector2 direction, float newKnockback, float hitTime)
     {
+        isHit = true;
+        hitTimer = hitTime;
+
+        rb.velocity = Vector2.zero;
+
+        rb.gravityScale = baseGravity;
+        dashing = false;
+        dashTimer = 0;
+
         damageTaken += damage;
-        Debug.Log(direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * knockbackMultiplier));
-        rb.AddForce((direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * knockbackMultiplier)) + Vector2.up * baseUpKnockback, ForceMode2D.Impulse);
+        rb.AddForce((direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * newKnockback)) + Vector2.up * baseUpKnockback, ForceMode2D.Impulse);
     }
 
     public void Jump(bool startJump)
     {
-        if (dashing)
+        if (dashing || isStunByAttack)
             return;
-
-
 
         if(startJump)
         {
@@ -180,7 +258,7 @@ public class PlayerController : MonoBehaviour
 
     public void Dash()
     {
-        if (movements.magnitude < inputsMinima || dashed)
+        if (movements.magnitude < inputsMinima || dashed || isStunByAttack || isHit)
             return;
         if(Time.time - lastDashed > minimumDashInterval)
         {
@@ -193,34 +271,97 @@ public class PlayerController : MonoBehaviour
         
     }
 
+    public void EnableCollisions(Collider2D coll)
+    {
+        foreach (Collider2D item in collidersParent.GetComponents<Collider2D>())
+        {
+            Debug.Log(item.gameObject.name);
+            Debug.Log(coll.gameObject.name);
+            Debug.Log("ff    ");
+            Physics2D.IgnoreCollision(coll, item);
+        }
+    }
+
     public void SwordHit(Collider2D col)
     {
-        if (hittedTargetOnAttack)
+        PlayerController enemyController = col.GetComponentInParent<PlayerController>();
+
+        if (playersHitted.Contains(enemyController) || col.gameObject.layer == swordMask)
             return;
 
-        PlayerController enemyController = col.GetComponentInParent<PlayerController>();
+        
 
         if (enemyController != null && enemyController != this)
         {
-            hittedTargetOnAttack = true;
-            enemyController.TakeDamage(10, (enemyController.transform.position - transform.position).normalized);
+            rb.gravityScale = baseGravity;
+            dashing = false;
+            dashTimer = 0;
+
+            playersHitted.Add(enemyController);
+            enemyController.TakeDamage(currentAttack.damage, (enemyController.transform.position - transform.position).normalized, currentAttack.knockback, currentAttack.stunTime);
         }
+    }
+
+    public Attack GetAttackFromEnum(AttackEnum newEnum)
+    {
+        foreach (var item in attackList)
+        {
+            if(item.AttackEnum == newEnum)
+            {
+                return item;
+            }
+        }
+        return attackList[0];
+    }
+
+    public void Respawn()
+    {
+        damageTaken = 0;
+        rb.velocity = Vector2.zero;
+        transform.position = Vector2.zero;
     }
 
     public void StartAttack()
     {
+        rb.gravityScale = baseGravity;
+        dashing = false;
+        dashTimer = 0;
+
         swordCollider.enabled = true;
     }
 
     public void EndAttack()
     {
+        attacking = false;
         swordCollider.enabled = false;
-        hittedTargetOnAttack = false;
+        playersHitted.Clear();
     }
 
     public void Forward()
     {
-        UpAnimator.Play("ForwardAttack");
+        if (attacking || isStunByAttack)
+            return;
+
+        attacking = true;
+        SetCurrentAttack(AttackEnum.Forward);
+        UpAnimator.Play("ForwardAttack", 0, 0);
+    }
+
+    public void Smash()
+    {
+        if (attacking || isStunByAttack || !grounded || jumping)
+            return;
+
+        attacking = true;
+        SetCurrentAttack(AttackEnum.UpSmash);
+        UpAnimator.Play("UpSmash", 0, 0);
+    }
+
+    private void SetCurrentAttack(AttackEnum newEnum)
+    {
+        currentAttack = GetAttackFromEnum(newEnum);
+        isStunByAttack = true;
+        currentAttackDelay = currentAttack.attackDelay;
     }
 
     public void OnMove(InputAction.CallbackContext ctx)
@@ -242,4 +383,19 @@ public class PlayerController : MonoBehaviour
     {
         Forward();
     }
+
+    public void OnSmash(InputAction.CallbackContext ctx)
+    {
+        Smash();
+    }
+}
+
+[System.Serializable]
+public enum AttackEnum : uint
+{
+    None,
+    Forward,
+    UpSmash,
+    DownSmash,
+    ForwardSmash
 }
