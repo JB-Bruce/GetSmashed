@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 2247888622094998354}
   - component: {fileID: 8739833816601370906}
   - component: {fileID: 9048595685686936318}
+  - component: {fileID: 4818478728065019573}
   m_Layer: 0
   m_Name: Plateforme
   m_TagString: Untagged
@@ -190,3 +191,17 @@ BoxCollider2D:
   serializedVersion: 2
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!114 &4818478728065019573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7898707116649582249}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7018de40362efbc479ac0575def1b407, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  WayPoints: []
+  speed: 0
