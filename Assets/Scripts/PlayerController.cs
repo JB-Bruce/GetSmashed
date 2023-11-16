@@ -71,6 +71,7 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] GameObject hitParticlesPrefab;
     [SerializeField] GameObject wallHitParticlesPrefab;
+    [SerializeField] GameObject shieldHitParticlesPrefab;
 
     [SerializeField] List<SpriteRenderer> tShirtParts;
 
@@ -101,6 +102,19 @@ public class PlayerController : MonoBehaviour
     bool isHit = false;
     float hitTimer = 0f;
 
+    public bool isShielding { get; private set; } = false;
+    float shieldLife;
+    [SerializeField] float shieldMaxLife;
+    [SerializeField] float shieldRegenSpeed;
+    [SerializeField] float shieldLostOnActivate;
+    [SerializeField] float breakShieldStunTime;
+    bool pressingShieldBtn = false;
+
+    [SerializeField] GameObject shieldGO;
+    [SerializeField] SpriteRenderer shieldSprite;
+
+    [SerializeField] GameObject stunGO;
+
     public PlayerPlatformeManager plat;
 
 
@@ -114,6 +128,13 @@ public class PlayerController : MonoBehaviour
 
         Color c = PlayerManager.instance.AddPlayer(this);
 
+        shieldLife = shieldMaxLife;
+
+        isShielding = false;
+        shieldGO.SetActive(false);
+
+        stunGO.SetActive(false);
+
         SetColor(c);
     }
 
@@ -123,6 +144,8 @@ public class PlayerController : MonoBehaviour
         {
             item.color = c;
         }
+
+        shieldSprite.color = new(c.r, c.g, c.b, 72f/255f);
     }
 
     private void Update()
@@ -133,12 +156,41 @@ public class PlayerController : MonoBehaviour
 
         bottomAnimator.SetFloat("Speed", Mathf.Abs(velX));
 
+        if (pressingShieldBtn)
+            Shield(true);
+
+        if(isShielding)
+        {
+            shieldLife -= shieldLostOnActivate * Time.deltaTime;
+            if( shieldLife <= 0 )
+            {
+                isShielding = false;
+                shieldGO.SetActive(false);
+            }
+        }
+        else
+        {
+            shieldLife += shieldRegenSpeed * Time.deltaTime;
+        }
+        shieldLife = Mathf.Clamp(shieldLife, 0f, shieldMaxLife);
+        float ratio = shieldLife / shieldMaxLife;
+        shieldGO.transform.localScale = Vector2.one * ratio;
+
+
         if(isHit)
         {
+            if(!stunGO.activeInHierarchy)
+                stunGO.SetActive(true); 
+
             hitTimer -= Time.deltaTime;
             if(hitTimer < 0f)
+            {
+                stunGO.SetActive(false);
                 isHit = false;
+                hitTimer = 0f;
+            }
         }
+
 
         if (isStunByAttack)
         {
@@ -147,10 +199,6 @@ public class PlayerController : MonoBehaviour
                 isStunByAttack = false;
         }
 
-        /*if(Mathf.Abs(velX) > 0f)
-        {
-            Vector3 newScale = new(velX > 0 ? 1f : -1f, 1f, 1f);
-        }*/
 
         if (Mathf.Abs(movements.x) > inputsMinima && velX != 0)
         {
@@ -183,7 +231,7 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (isHit)
+        if (isHit || isShielding)
         {
             if(grounded)
                 rb.velocity = new(rb.velocity.x * horizontalDeceleration, rb.velocity.y);
@@ -239,8 +287,16 @@ public class PlayerController : MonoBehaviour
         if (invincible)
             return;
 
+        if(isShielding)
+        {
+            if (ReduceShield(damage))
+                return;
+
+            hitTime += breakShieldStunTime;
+        }
+
         isHit = true;
-        hitTimer = hitTime;
+        hitTimer += hitTime;
 
         rb.velocity = Vector2.zero;
 
@@ -256,7 +312,7 @@ public class PlayerController : MonoBehaviour
 
     public void Jump(bool startJump)
     {
-        if (dashing || isStunByAttack)
+        if (dashing || isStunByAttack || isHit || isShielding)
             return;
 
         if(startJump)
@@ -287,7 +343,7 @@ public class PlayerController : MonoBehaviour
 
     public void Dash()
     {
-        if (movements.magnitude < inputsMinima || dashed || isStunByAttack || isHit)
+        if (movements.magnitude < inputsMinima || dashed || isStunByAttack || isHit || isShielding)
             return;
         if(Time.time - lastDashed > minimumDashInterval)
         {
@@ -307,6 +363,20 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    public bool ReduceShield(float damage)
+    {
+        shieldLife -= damage;
+        if(shieldLife <= 0)
+        {
+            shieldLife = 0;
+            isShielding = false;
+            shieldGO.SetActive(false);
+
+            return false;
+        }
+        return true;
+    }
+
     public void SwordHit(Collider2D col, Vector2 nearHit)
     {
         PlayerController enemyController = col.GetComponentInParent<PlayerController>();
@@ -316,16 +386,24 @@ public class PlayerController : MonoBehaviour
 
         if (enemyController != null && enemyController != this)
         {
-            GameObject particle = Instantiate(hitParticlesPrefab, nearHit, Quaternion.identity);
-            Vector3 dir = col.transform.position - (Vector3)nearHit;
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-            particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle + 90f));
+            playersHitted.Add(enemyController);
 
             rb.gravityScale = baseGravity;
             dashing = false;
             dashTimer = 0;
 
-            playersHitted.Add(enemyController);
+            if(!enemyController.isShielding) 
+            {
+                GameObject particle = Instantiate(hitParticlesPrefab, nearHit, Quaternion.identity);
+                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
+            }
+            else
+            {
+                GameObject particle = Instantiate(shieldHitParticlesPrefab, nearHit, Quaternion.identity);
+                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
+            }
+            
+
             enemyController.TakeDamage(currentAttack.damage, (enemyController.transform.position - transform.position).normalized, currentAttack.knockback, currentAttack.stunTime);
         }
         else
@@ -345,6 +423,8 @@ public class PlayerController : MonoBehaviour
         }
         return attackList[0];
     }
+
+    
 
     public void Respawn()
     {
@@ -393,9 +473,29 @@ public class PlayerController : MonoBehaviour
         playersHitted.Clear();
     }
 
-    public void Forward()
+    private void Shield(bool start)
     {
         if (attacking || isStunByAttack)
+            return;
+
+        if(start)
+        {
+            if(shieldLife > 10f && !isShielding)
+            {
+                isShielding = true;
+                shieldGO.SetActive(true);
+            }
+        }
+        else
+        {
+            isShielding = false;
+            shieldGO.SetActive(false);
+        }
+    }
+
+    public void Forward()
+    {
+        if (attacking || isStunByAttack || isShielding)
             return;
 
         attacking = true;
@@ -405,7 +505,7 @@ public class PlayerController : MonoBehaviour
 
     public void Smash()
     {
-        if (attacking || isStunByAttack || !grounded || jumping)
+        if (attacking || isStunByAttack || !grounded || jumping || isShielding)
             return;
 
         attacking = true;
@@ -437,17 +537,26 @@ public class PlayerController : MonoBehaviour
 
     public void OnDash(InputAction.CallbackContext ctx)
     {
-        Dash();
+        if(ctx.performed)
+            Dash();
     }
 
     public void OnForward(InputAction.CallbackContext ctx)
     {
-        Forward();
+        if(ctx.performed)
+            Forward();
     }
 
     public void OnSmash(InputAction.CallbackContext ctx)
     {
-        Smash();
+        if(ctx.performed)
+            Smash();
+    }
+
+    public void OnShield(InputAction.CallbackContext ctx)
+    {
+        pressingShieldBtn = ctx.ReadValueAsButton();
+        Shield(ctx.ReadValueAsButton());
     }
 }
 
