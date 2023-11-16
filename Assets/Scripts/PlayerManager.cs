@@ -5,7 +5,6 @@ public class PlayerManager : MonoBehaviour
 {
     List<PlayerController> players = new();
 
-    [SerializeField] GameObject objectFollowerPrefab;
 
     [SerializeField] Color[] playerColors;
 
