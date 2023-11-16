@@ -10,6 +10,7 @@ public class PlayerManager : MonoBehaviour
 
     [SerializeField] Transform playerHealthParent;
     [SerializeField] GameObject healthPrefab;
+    [SerializeField] GameObject objectFollowerPrefab;
 
     public static PlayerManager instance;
 

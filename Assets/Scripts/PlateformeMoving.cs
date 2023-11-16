@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class PlateformeMoving : MonoBehaviour
@@ -9,22 +10,30 @@ public class PlateformeMoving : MonoBehaviour
     Transform target;
     [SerializeField] float speed;
     private int destPoint = 0;
+    private bool canMove = false;
 
 
     private void Start()
     {
-        target = WayPoints[0];
+        if (WayPoints.Count() >= 1)
+        {
+            canMove = true;
+            target = WayPoints[0];
+        }
     }
     // Update is called once per frame
     void Update()
     {
-        Vector3 dir = target.position - transform.position;
-        transform.Translate(speed * Time.deltaTime * dir.normalized, Space.World);
-
-        if (Vector3.Distance(transform.position, target.position) < 0.03f)
+        if(canMove) 
         {
-            destPoint = (destPoint + 1) % WayPoints.Length;
-            target = WayPoints[destPoint];
+            Vector3 dir = target.position - transform.position;
+            transform.Translate(speed * Time.deltaTime * dir.normalized, Space.World);
+
+            if (Vector3.Distance(transform.position, target.position) < 0.03f)
+            {
+                destPoint = (destPoint + 1) % WayPoints.Length;
+                target = WayPoints[destPoint];
+            }
         }
     }
 }
