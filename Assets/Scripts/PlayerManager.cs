@@ -5,7 +5,7 @@ public class PlayerManager : MonoBehaviour
 {
     List<PlayerController> players = new();
 
-    [SerializeField] GameObject objectFollowerPrefab;
+    [SerializeField] GameObject cursor;
 
     [SerializeField] Color[] playerColors;
 
@@ -19,17 +19,9 @@ public class PlayerManager : MonoBehaviour
     public void AddPlayer(PlayerController player)
     {
         players.Add(player);
-        GameObject newObject = Instantiate(objectFollowerPrefab);
+        GameObject newObject = Instantiate(cursor);
         newObject.GetComponent<ObjectFollow>().Init(player, playerColors[(players.Count - 1) % playerColors.Length], "Player " + (players.Count));
 
-        foreach (var item in players)
-        {
-            if(item != player)
-            {
-                item.EnableCollisions(player.plat.box);
-                player.EnableCollisions(item.plat.box);
-            }
-        }
         
     }
 }

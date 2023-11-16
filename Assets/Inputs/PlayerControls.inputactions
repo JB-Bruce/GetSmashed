@@ -218,6 +218,54 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "SelectionMenu",
+            "id": "a665aff9-baf6-4ba8-b297-b75e60834e13",
+            "actions": [
+                {
+                    "name": "Move",
+                    "type": "Value",
+                    "id": "33401657-b781-4776-a447-9d3de00958b0",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Selection",
+                    "type": "Button",
+                    "id": "cd557db1-ef9e-45af-9251-43a269faf0b6",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "b6a49156-cf68-4f89-ba9b-46182ddd7cc1",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Selection",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "65e58fbd-626d-47d5-9929-b935efced8b0",
+                    "path": "<Gamepad>/leftStick",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Move",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": [
