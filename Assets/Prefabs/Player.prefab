@@ -486,11 +486,23 @@ MonoBehaviour:
     stunTime: 0.5
     attackDelay: 0.8
     slowMovementsOnAttack: 0
-  - AttackEnum: 2
+  - AttackEnum: 5
     damage: 15
     knockback: 10
     stunTime: 1.3
     attackDelay: 1.5
+    slowMovementsOnAttack: 1
+  - AttackEnum: 4
+    damage: 13
+    knockback: 13
+    stunTime: 1
+    attackDelay: 1.2
+    slowMovementsOnAttack: 1
+  - AttackEnum: 3
+    damage: 13
+    knockback: 13
+    stunTime: 1
+    attackDelay: 1.2
     slowMovementsOnAttack: 1
   swordMask:
     serializedVersion: 2
@@ -645,6 +657,30 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: a2c98ffb-0016-45fe-bd7b-869391e8de96
     m_ActionName: PlayerMap/Shield[/XInputControllerWindows/rightTrigger,/XInputControllerWindows/leftTrigger,/Keyboard/ctrl]
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 33401657-b781-4776-a447-9d3de00958b0
+    m_ActionName: SelectionMenu/Move[/XInputControllerWindows/leftStick]
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: cd557db1-ef9e-45af-9251-43a269faf0b6
+    m_ActionName: SelectionMenu/Selection[/XInputControllerWindows/buttonSouth]
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 5293947314934882844}
+        m_TargetAssemblyTypeName: PlayerController, Assembly-CSharp
+        m_MethodName: OnEmote
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: c9b761df-ae1d-412e-a5f8-83527f915c86
+    m_ActionName: PlayerMap/New action
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: PlayerMap

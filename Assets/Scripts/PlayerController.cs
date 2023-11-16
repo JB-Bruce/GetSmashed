@@ -102,6 +102,9 @@ public class PlayerController : MonoBehaviour
     bool isHit = false;
     float hitTimer = 0f;
 
+    float inputsDurationTimer;
+    bool emoting;
+
     public bool isShielding { get; private set; } = false;
     float shieldLife;
     [SerializeField] float shieldMaxLife;
@@ -210,7 +213,15 @@ public class PlayerController : MonoBehaviour
 
         if(hit.collider != null)
         {
-            if(!grounded)
+
+            if (currentAttack.AttackEnum == AttackEnum.DownSmash && !(hit.collider.gameObject.layer == LayerMask.NameToLayer("Player") || hit.collider.gameObject.layer == LayerMask.NameToLayer("Sword")))
+            {
+                Debug.Log(hit.transform.name);
+                EndAttack();
+                UpAnimator.SetTrigger("EndDownSmash");
+            }
+
+            if (!grounded)
                 bottomAnimator.SetBool("StoppedJump", true);
 
             if(dashed && !dashing)
@@ -277,8 +288,17 @@ public class PlayerController : MonoBehaviour
         if (movements.magnitude > inputsMinima)
         {
             rb.velocity = new(Mathf.Clamp(rb.velocity.x + movements.x * acceleration * Time.fixedDeltaTime, -maxSpeed, maxSpeed), rb.velocity.y);
-        }
+            inputsDurationTimer += Time.fixedDeltaTime;
 
+            if(inputsDurationTimer > .2f )
+            {
+                TryStopEmote();
+            }
+        }
+        else
+        {
+            inputsDurationTimer = 0f;
+        }
     }
 
 
@@ -295,6 +315,9 @@ public class PlayerController : MonoBehaviour
             hitTime += breakShieldStunTime;
         }
 
+        TryStopEmote();
+        
+
         isHit = true;
         hitTimer += hitTime;
 
@@ -310,6 +333,15 @@ public class PlayerController : MonoBehaviour
         takeDamageEvent.Invoke();
     }
 
+    private void TryStopEmote()
+    {
+        if (emoting)
+        {
+            UpAnimator.SetTrigger("StopEmote");
+            emoting = false;
+        }
+    }
+
     public void Jump(bool startJump)
     {
         if (dashing || isStunByAttack || isHit || isShielding)
@@ -319,6 +351,8 @@ public class PlayerController : MonoBehaviour
         {
             if ((!grounded && Time.time - lastJump < doubleJumpIntervalMinima) || currentDoubleJumpAmount >= doubleJumpAmount)
                 return;
+
+            TryStopEmote();
 
             if(!grounded)
                 currentDoubleJumpAmount++;
@@ -345,6 +379,7 @@ public class PlayerController : MonoBehaviour
     {
         if (movements.magnitude < inputsMinima || dashed || isStunByAttack || isHit || isShielding)
             return;
+
         if(Time.time - lastDashed > minimumDashInterval)
         {
             dashed = true;
@@ -395,12 +430,12 @@ public class PlayerController : MonoBehaviour
             if(!enemyController.isShielding) 
             {
                 GameObject particle = Instantiate(hitParticlesPrefab, nearHit, Quaternion.identity);
-                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
+                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 180, 0));
             }
             else
             {
                 GameObject particle = Instantiate(shieldHitParticlesPrefab, nearHit, Quaternion.identity);
-                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
+                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 180, 0));
             }
             
 
@@ -408,7 +443,8 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            Instantiate(wallHitParticlesPrefab, nearHit, Quaternion.identity);
+            GameObject go = Instantiate(wallHitParticlesPrefab, nearHit, Quaternion.identity);
+            go.transform.rotation = Quaternion.Euler(new Vector3(0, 180, 0));
         }
     }
 
@@ -471,6 +507,7 @@ public class PlayerController : MonoBehaviour
         attacking = false;
         swordCollider.enabled = false;
         playersHitted.Clear();
+        currentAttack = GetAttackFromEnum(AttackEnum.None);
     }
 
     private void Shield(bool start)
@@ -498,6 +535,8 @@ public class PlayerController : MonoBehaviour
         if (attacking || isStunByAttack || isShielding)
             return;
 
+        emoting = false;
+
         attacking = true;
         SetCurrentAttack(AttackEnum.Forward);
         UpAnimator.Play("ForwardAttack", 0, 0);
@@ -505,12 +544,55 @@ public class PlayerController : MonoBehaviour
 
     public void Smash()
     {
-        if (attacking || isStunByAttack || !grounded || jumping || isShielding)
+        if (attacking || isStunByAttack || isShielding)
             return;
 
+        if (!grounded || jumping)
+        {
+            if(movements.y < 0f)
+            {
+                emoting = false;
+                attacking = true;
+
+                SetCurrentAttack(AttackEnum.DownSmash);
+                UpAnimator.Play("DownSmash", 0, 0);
+            }
+            return;
+        }
+
+        emoting = false;
         attacking = true;
-        SetCurrentAttack(AttackEnum.UpSmash);
-        UpAnimator.Play("UpSmash", 0, 0);
+
+        Vector2 newMovements = movements.normalized;
+
+        float northDist = Vector2.Distance(newMovements, Vector2.up);
+        float eastDist = Vector2.Distance(newMovements, Vector2.right);
+        float southDist = Vector2.Distance(newMovements, Vector2.down);
+        float westDist = Vector2.Distance(newMovements, Vector2.left);
+
+        float middleDist = newMovements.magnitude;
+
+
+        if (middleDist < 0.1f)
+        {
+            SetCurrentAttack(AttackEnum.MiddleSmash);
+            UpAnimator.Play("MiddleSmash", 0, 0);
+        }
+        else if(northDist < southDist && northDist < eastDist && northDist < westDist)
+        {
+            SetCurrentAttack(AttackEnum.UpSmash);
+            UpAnimator.Play("UpSmash", 0, 0);
+        }
+        else if (southDist < eastDist && southDist < northDist && southDist < westDist)
+        {
+            SetCurrentAttack(AttackEnum.DownSmash);
+            UpAnimator.Play("DownSmash", 0, 0);
+        }
+        else
+        {
+            SetCurrentAttack(AttackEnum.ForwardSmash);
+            UpAnimator.Play("ForwardSmash", 0, 0);
+        }
     }
 
     private void SetCurrentAttack(AttackEnum newEnum)
@@ -523,6 +605,15 @@ public class PlayerController : MonoBehaviour
     private void EndInvincibility()
     {
         invincible = false;
+    }
+
+    private void Emote()
+    {
+        if (attacking || isStunByAttack || !grounded || jumping || isShielding || isHit || emoting)
+            return;
+
+        emoting = true;
+        UpAnimator.Play("TopEmote1", 0, 0);
     }
 
     public void OnMove(InputAction.CallbackContext ctx)
@@ -558,6 +649,12 @@ public class PlayerController : MonoBehaviour
         pressingShieldBtn = ctx.ReadValueAsButton();
         Shield(ctx.ReadValueAsButton());
     }
+
+    public void OnEmote(InputAction.CallbackContext ctx)
+    {
+        if(ctx.performed)
+            Emote();
+    }
 }
 
 [System.Serializable]
@@ -567,5 +664,6 @@ public enum AttackEnum : uint
     Forward,
     UpSmash,
     DownSmash,
-    ForwardSmash
+    ForwardSmash,
+    MiddleSmash
 }
