@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
@@ -50,8 +51,8 @@ public class PlayerController : MonoBehaviour
 
     [Header("Others")]
 
+    public int lifes;
     
-
     public Rigidbody2D rb;
 
     [SerializeField] List<Attack> attackList;
@@ -68,8 +69,18 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] Transform collidersParent;
 
-    float damageTaken = 0.0f;
+    [SerializeField] GameObject hitParticlesPrefab;
+    [SerializeField] GameObject wallHitParticlesPrefab;
 
+    [SerializeField] List<SpriteRenderer> tShirtParts;
+
+    public UnityEvent takeDamageEvent;
+    public UnityEvent dieEvent;
+
+    public float damageTaken { get; private set; } = 0f;
+
+    bool invincible;
+    [SerializeField] float invincibleTime;
 
     Vector2 movements;
 
@@ -95,10 +106,23 @@ public class PlayerController : MonoBehaviour
 
     private void Start()
     {
+        invincible = true;
+        Invoke("EndInvincibility", invincibleTime);
+
         rb.gravityScale = jumpingGravity;
         swordCollider.enabled = false;
 
-        PlayerManager.instance.AddPlayer(this);
+        Color c = PlayerManager.instance.AddPlayer(this);
+
+        SetColor(c);
+    }
+
+    private void SetColor(Color c)
+    {
+        foreach (var item in tShirtParts)
+        {
+            item.color = c;
+        }
     }
 
     private void Update()
@@ -212,6 +236,9 @@ public class PlayerController : MonoBehaviour
 
     public void TakeDamage(float damage, Vector2 direction, float newKnockback, float hitTime)
     {
+        if (invincible)
+            return;
+
         isHit = true;
         hitTimer = hitTime;
 
@@ -223,6 +250,8 @@ public class PlayerController : MonoBehaviour
 
         damageTaken += damage;
         rb.AddForce((direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * newKnockback)) + Vector2.up * baseUpKnockback, ForceMode2D.Impulse);
+
+        takeDamageEvent.Invoke();
     }
 
     public void Jump(bool startJump)
@@ -268,37 +297,40 @@ public class PlayerController : MonoBehaviour
             dashDirection = movements.normalized;
             lastDashed = Time.time;
         }
-        
     }
 
     public void EnableCollisions(Collider2D coll)
     {
         foreach (Collider2D item in collidersParent.GetComponents<Collider2D>())
         {
-            Debug.Log(item.gameObject.name);
-            Debug.Log(coll.gameObject.name);
-            Debug.Log("ff    ");
             Physics2D.IgnoreCollision(coll, item);
         }
     }
 
-    public void SwordHit(Collider2D col)
+    public void SwordHit(Collider2D col, Vector2 nearHit)
     {
         PlayerController enemyController = col.GetComponentInParent<PlayerController>();
 
         if (playersHitted.Contains(enemyController) || col.gameObject.layer == swordMask)
             return;
 
-        
-
         if (enemyController != null && enemyController != this)
         {
+            GameObject particle = Instantiate(hitParticlesPrefab, nearHit, Quaternion.identity);
+            Vector3 dir = col.transform.position - (Vector3)nearHit;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle + 90f));
+
             rb.gravityScale = baseGravity;
             dashing = false;
             dashTimer = 0;
 
             playersHitted.Add(enemyController);
             enemyController.TakeDamage(currentAttack.damage, (enemyController.transform.position - transform.position).normalized, currentAttack.knockback, currentAttack.stunTime);
+        }
+        else
+        {
+            Instantiate(wallHitParticlesPrefab, nearHit, Quaternion.identity);
         }
     }
 
@@ -316,9 +348,33 @@ public class PlayerController : MonoBehaviour
 
     public void Respawn()
     {
-        damageTaken = 0;
+        if (invincible)
+            return;
+
+        invincible = true;
+        Invoke("EndInvincibility", invincibleTime);
+
         rb.velocity = Vector2.zero;
         transform.position = Vector2.zero;
+
+        lifes = Math.Clamp(lifes - 1, 0, 99);
+        damageTaken = 0;
+        
+
+        dieEvent.Invoke();
+
+        if (lifes == 0)
+            Die();
+    }
+
+    private void Die()
+    {
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            transform.GetChild(i).gameObject.SetActive(false);
+        }
+
+        this.enabled = false;
     }
 
     public void StartAttack()
@@ -362,6 +418,11 @@ public class PlayerController : MonoBehaviour
         currentAttack = GetAttackFromEnum(newEnum);
         isStunByAttack = true;
         currentAttackDelay = currentAttack.attackDelay;
+    }
+
+    private void EndInvincibility()
+    {
+        invincible = false;
     }
 
     public void OnMove(InputAction.CallbackContext ctx)

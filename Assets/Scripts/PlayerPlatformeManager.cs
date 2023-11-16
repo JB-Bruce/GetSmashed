@@ -15,7 +15,7 @@ public class PlayerPlatformeManager : MonoBehaviour
 
     private void Update()
     {
-        RaycastHit2D hit = Physics2D.Raycast(feet.position, Vector2.down, .3f, mask);
+        RaycastHit2D hit = Physics2D.Raycast(feet.position, Vector2.down, .5f, mask);
 
         if(hit.transform != null)
         {
