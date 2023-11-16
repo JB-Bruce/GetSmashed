@@ -14,6 +14,6 @@ public class PlayerSwordTriggerDetection : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        playerController.SwordHit(collision);
+        playerController.SwordHit(collision, collision.ClosestPoint(transform.position));
     }
 }

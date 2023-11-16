@@ -23,6 +23,8 @@ public class ObjectFollow : MonoBehaviour
 
     private void Update()
     {
+        if(!followedPlayer.enabled)
+            gameObject.SetActive(false);
         transform.position = followedPlayer.transform.position;
     }
 }

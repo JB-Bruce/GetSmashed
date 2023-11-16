@@ -9,6 +9,9 @@ public class PlayerManager : MonoBehaviour
 
     [SerializeField] Color[] playerColors;
 
+    [SerializeField] Transform playerHealthParent;
+    [SerializeField] GameObject healthPrefab;
+
     public static PlayerManager instance;
 
     private void Awake()
@@ -16,11 +19,17 @@ public class PlayerManager : MonoBehaviour
         instance = this;
     }
 
-    public void AddPlayer(PlayerController player)
+    public Color AddPlayer(PlayerController player)
     {
         players.Add(player);
         GameObject newObject = Instantiate(objectFollowerPrefab);
-        newObject.GetComponent<ObjectFollow>().Init(player, playerColors[(players.Count - 1) % playerColors.Length], "Player " + (players.Count));
+
+        Color playerColor = playerColors[(players.Count - 1) % playerColors.Length];
+
+        newObject.GetComponent<ObjectFollow>().Init(player, playerColor, "Player " + (players.Count));
+
+        GameObject health = Instantiate(healthPrefab, playerHealthParent);
+        health.GetComponent<PlayerStats>().Init(player, "Player " + (players.Count), playerColor);
 
         foreach (var item in players)
         {
@@ -30,6 +39,7 @@ public class PlayerManager : MonoBehaviour
                 player.EnableCollisions(item.plat.box);
             }
         }
-        
+
+        return playerColor;
     }
 }
