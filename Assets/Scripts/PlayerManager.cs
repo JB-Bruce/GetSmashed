@@ -1,10 +1,16 @@
+using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerManager : MonoBehaviour
 {
     List<PlayerController> players = new();
 
+    List<PlayerController> deadPlayers = new();
+
+    [SerializeField] Transform[] spawnPoints;
 
     [SerializeField] Color[] playerColors;
 
@@ -12,11 +18,20 @@ public class PlayerManager : MonoBehaviour
     [SerializeField] GameObject healthPrefab;
     [SerializeField] GameObject objectFollowerPrefab;
 
+    [SerializeField] GameObject winCanvas;
+    [SerializeField] TextMeshProUGUI playerNameText;
+    [SerializeField] float timeScaleReduceSpeed;
+
     public static PlayerManager instance;
 
     private void Awake()
     {
         instance = this;
+    }
+
+    private void Start()
+    {
+        winCanvas.SetActive(false);
     }
 
     public Color AddPlayer(PlayerController player)
@@ -40,6 +55,45 @@ public class PlayerManager : MonoBehaviour
             }
         }
 
+        Replace(player);
+
         return playerColor;
+    }
+
+    public void Replace(PlayerController pc)
+    {
+        pc.transform.position = spawnPoints[Random.Range(0, spawnPoints.Length)].position;
+    }
+
+    public void Die(PlayerController pc)
+    {
+        players.Remove(pc);
+        deadPlayers.Add(pc);
+
+        if (players.Count == 1)
+            Win(players[0]);
+    }
+
+    private void Win(PlayerController pc)
+    {
+        StartCoroutine(EWin());
+        winCanvas.SetActive(true);
+    }
+
+    IEnumerator EWin()
+    {
+        while(Time.timeScale > 0f)
+        {
+            float newTimeScale = Mathf.Clamp(Time.timeScale - (timeScaleReduceSpeed * Time.deltaTime), 0f, 1f);
+            Time.timeScale = newTimeScale;
+
+            yield return null;
+        }
+    }
+
+    public void Restart()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

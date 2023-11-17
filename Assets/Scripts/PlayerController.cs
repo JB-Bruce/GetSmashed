@@ -78,6 +78,10 @@ public class PlayerController : MonoBehaviour
     public UnityEvent takeDamageEvent;
     public UnityEvent dieEvent;
 
+    [SerializeField] LayerMask groundMask;
+
+    [SerializeField] float upSmashForce;
+
     public float damageTaken { get; private set; } = 0f;
 
     bool invincible;
@@ -105,6 +109,8 @@ public class PlayerController : MonoBehaviour
     float inputsDurationTimer;
     bool emoting;
 
+    [SerializeField] ParticleSystem dashEffect;
+
     public bool isShielding { get; private set; } = false;
     float shieldLife;
     [SerializeField] float shieldMaxLife;
@@ -119,6 +125,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] GameObject stunGO;
 
     public PlayerPlatformeManager plat;
+
+    bool emoteBot;
+    bool emoteTop;
 
 
     private void Start()
@@ -153,7 +162,7 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        RaycastHit2D hit = Physics2D.Raycast(feetPoint.position, Vector2.down, .1f);
+        RaycastHit2D hit = Physics2D.Raycast(feetPoint.position, Vector2.down, .1f, groundMask);
 
         float velX = rb.velocity.x;
 
@@ -214,7 +223,7 @@ public class PlayerController : MonoBehaviour
         if(hit.collider != null)
         {
 
-            if (currentAttack.AttackEnum == AttackEnum.DownSmash && !(hit.collider.gameObject.layer == LayerMask.NameToLayer("Player") || hit.collider.gameObject.layer == LayerMask.NameToLayer("Sword")))
+            if (currentAttack.AttackEnum == AttackEnum.DownSmash && swordCollider.enabled)
             {
                 Debug.Log(hit.transform.name);
                 EndAttack();
@@ -256,7 +265,8 @@ public class PlayerController : MonoBehaviour
         }
 
 
-        rb.velocity = new(rb.velocity.x, Mathf.Clamp(rb.velocity.y, -maxFallSpeed, maxFallSpeed));
+        if(currentAttack.AttackEnum != AttackEnum.UpSmash)
+            rb.velocity = new(rb.velocity.x, Mathf.Clamp(rb.velocity.y, -maxFallSpeed, maxFallSpeed));
 
         if (isStunByAttack && currentAttack.slowMovementsOnAttack)
         {
@@ -273,6 +283,7 @@ public class PlayerController : MonoBehaviour
             if(dashTimer >= dashDuration)
             {
                 rb.gravityScale = baseGravity;
+                dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 dashing = false;
                 dashTimer = 0;
             }
@@ -290,7 +301,7 @@ public class PlayerController : MonoBehaviour
             rb.velocity = new(Mathf.Clamp(rb.velocity.x + movements.x * acceleration * Time.fixedDeltaTime, -maxSpeed, maxSpeed), rb.velocity.y);
             inputsDurationTimer += Time.fixedDeltaTime;
 
-            if(inputsDurationTimer > .2f )
+            if(inputsDurationTimer > .1f )
             {
                 TryStopEmote();
             }
@@ -325,6 +336,7 @@ public class PlayerController : MonoBehaviour
 
         rb.gravityScale = baseGravity;
         dashing = false;
+        dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         dashTimer = 0;
 
         damageTaken += damage;
@@ -337,7 +349,12 @@ public class PlayerController : MonoBehaviour
     {
         if (emoting)
         {
-            UpAnimator.SetTrigger("StopEmote");
+            if(emoteTop)
+                UpAnimator.SetTrigger("StopEmote");
+
+            TryStopBotEmote();
+
+            emoteTop = false;
             emoting = false;
         }
     }
@@ -352,6 +369,7 @@ public class PlayerController : MonoBehaviour
             if ((!grounded && Time.time - lastJump < doubleJumpIntervalMinima) || currentDoubleJumpAmount >= doubleJumpAmount)
                 return;
 
+            emoteBot = false;
             TryStopEmote();
 
             if(!grounded)
@@ -382,6 +400,8 @@ public class PlayerController : MonoBehaviour
 
         if(Time.time - lastDashed > minimumDashInterval)
         {
+            dashEffect.Play();
+
             dashed = true;
             dashing = true;
             rb.gravityScale = 0f;
@@ -425,6 +445,7 @@ public class PlayerController : MonoBehaviour
 
             rb.gravityScale = baseGravity;
             dashing = false;
+            dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             dashTimer = 0;
 
             if(!enemyController.isShielding) 
@@ -475,7 +496,8 @@ public class PlayerController : MonoBehaviour
 
         lifes = Math.Clamp(lifes - 1, 0, 99);
         damageTaken = 0;
-        
+
+        PlayerManager.instance.Replace(this);
 
         dieEvent.Invoke();
 
@@ -491,12 +513,15 @@ public class PlayerController : MonoBehaviour
         }
 
         this.enabled = false;
+
+        PlayerManager.instance.Die(this);
     }
 
     public void StartAttack()
     {
         rb.gravityScale = baseGravity;
         dashing = false;
+        dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         dashTimer = 0;
 
         swordCollider.enabled = true;
@@ -537,9 +562,20 @@ public class PlayerController : MonoBehaviour
 
         emoting = false;
 
+        TryStopBotEmote();
+
         attacking = true;
         SetCurrentAttack(AttackEnum.Forward);
         UpAnimator.Play("ForwardAttack", 0, 0);
+    }
+
+    private void TryStopBotEmote()
+    {
+        if (emoteBot)
+        {
+            emoteBot = false;
+            bottomAnimator.SetTrigger("StopEmote");
+        }
     }
 
     public void Smash()
@@ -551,16 +587,29 @@ public class PlayerController : MonoBehaviour
         {
             if(movements.y < 0f)
             {
-                emoting = false;
+                TryStopBotEmote();
                 attacking = true;
 
                 SetCurrentAttack(AttackEnum.DownSmash);
                 UpAnimator.Play("DownSmash", 0, 0);
             }
+
+            if(movements.y > 0f)
+            {
+                TryStopBotEmote();
+                attacking = true;
+
+                rb.gravityScale = baseGravity;
+                rb.velocity = Vector2.zero;
+                rb.AddForce(new(0, upSmashForce), ForceMode2D.Impulse);
+                SetCurrentAttack(AttackEnum.UpSmash);
+                UpAnimator.Play("UpSmash", 0, 0);
+            }
+
             return;
         }
 
-        emoting = false;
+        TryStopBotEmote();
         attacking = true;
 
         Vector2 newMovements = movements.normalized;
@@ -580,6 +629,9 @@ public class PlayerController : MonoBehaviour
         }
         else if(northDist < southDist && northDist < eastDist && northDist < westDist)
         {
+            rb.gravityScale = baseGravity;
+            rb.velocity = Vector2.zero;
+            rb.AddForce(new(0, upSmashForce), ForceMode2D.Impulse);
             SetCurrentAttack(AttackEnum.UpSmash);
             UpAnimator.Play("UpSmash", 0, 0);
         }
@@ -613,7 +665,11 @@ public class PlayerController : MonoBehaviour
             return;
 
         emoting = true;
-        UpAnimator.Play("TopEmote1", 0, 0);
+        emoteTop = true;
+        emoteBot = true;
+
+        UpAnimator.Play("TopEmote2", 0, 0);
+        bottomAnimator.Play("BotEmote2", 0, 0);
     }
 
     public void OnMove(InputAction.CallbackContext ctx)
