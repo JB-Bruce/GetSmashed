@@ -236,6 +236,12 @@ public class PlayerController : MonoBehaviour
         }
 
 
+        if(movements.y < -0.5f)
+        {
+            plat.GoDown();
+        }
+
+
         if (Mathf.Abs(movements.x) > inputsMinima && velX != 0)
         {
             Vector3 newScale = new(movements.x > 0 ? 1f : -1f, 1f, 1f);
@@ -489,6 +495,9 @@ public class PlayerController : MonoBehaviour
 
     public void SwordHit(Collider2D col, Vector2 nearHit)
     {
+        if (!PlayerManager.instance.started)
+            return;
+
         PlayerController enemyController = col.GetComponentInParent<PlayerController>();
 
         if (playersHitted.Contains(enemyController) || col.gameObject.layer == swordMask)
@@ -547,23 +556,26 @@ public class PlayerController : MonoBehaviour
             UpAnimator.SetTrigger("EndDownSmash");
         }
 
-        audioSource.PlayOneShot(respawnClip);
-
-        invincible = true;
-        Invoke("EndInvincibility", invincibleTime);
-
         rb.velocity = Vector2.zero;
         transform.position = Vector2.zero;
 
-        lifes = Math.Clamp(lifes - 1, 0, 99);
         damageTaken = 0;
 
         PlayerManager.instance.Replace(this);
 
-        dieEvent.Invoke();
+        if (PlayerManager.instance.started)
+        {
+            invincible = true;
+            Invoke("EndInvincibility", invincibleTime);
 
-        if (lifes == 0)
-            Die();
+            audioSource.PlayOneShot(respawnClip);
+
+            lifes = Math.Clamp(lifes - 1, 0, 99);
+            dieEvent.Invoke();
+
+            if (lifes == 0)
+                Die();
+        }
     }
 
     private void Die()
@@ -598,7 +610,7 @@ public class PlayerController : MonoBehaviour
 
     private void Shield(bool start)
     {
-        if (attacking || isStunByAttack)
+        if (attacking || isStunByAttack || isHit)
             return;
 
         if(start)
@@ -618,7 +630,7 @@ public class PlayerController : MonoBehaviour
 
     public void Forward()
     {
-        if (attacking || isStunByAttack || isShielding)
+        if (attacking || isStunByAttack || isShielding || isHit)
             return;
 
         emoting = false;
@@ -643,7 +655,7 @@ public class PlayerController : MonoBehaviour
 
     public void Smash()
     {
-        if (attacking || isStunByAttack || isShielding)
+        if (attacking || isStunByAttack || isShielding || isHit)
             return;
 
         if (!grounded || jumping)

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using static UnityEditor.Experimental.GraphView.GraphView;
@@ -22,7 +23,18 @@ public class PlayerManager : MonoBehaviour
 
     [SerializeField] GameObject winCanvas;
     [SerializeField] TextMeshProUGUI playerNameText;
+    
     [SerializeField] float timeScaleReduceSpeed;
+
+    [SerializeField] GameObject startCanvasGO;
+    [SerializeField] TextMeshProUGUI timeLeftText;
+    [SerializeField] TextMeshProUGUI startsInText;
+
+    [SerializeField] Animator startAnimator;
+
+    public float startTime;
+
+    public bool started { get; private set; } = false;
 
     public static PlayerManager instance;
 
@@ -34,6 +46,30 @@ public class PlayerManager : MonoBehaviour
     private void Start()
     {
         winCanvas.SetActive(false);
+    }
+
+    private void Update()
+    {
+        if (started)
+            return;
+
+        startTime = Mathf.Clamp(startTime -= Time.deltaTime, 0, 99.9f);
+        timeLeftText.text = startTime.ToString("F1") + "s";
+
+        if(startTime <= 0)
+        {
+            if (players.Count >= 2)
+            {
+                GetComponent<PlayerInputManager>().joinBehavior = PlayerJoinBehavior.JoinPlayersManually;
+                startAnimator.Play("StartEnd", 0, 0);
+                started = true;
+            }
+            else
+            {
+                timeLeftText.enabled = false;
+                startsInText.text = "Need 2 players";
+            }
+        }
     }
 
     public Color AddPlayer(PlayerController player, out string pName)
@@ -102,5 +138,11 @@ public class PlayerManager : MonoBehaviour
     {
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void MainMenu()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu");
     }
 }

@@ -5,5 +5,4 @@ using UnityEngine;
 public class Platforme : MonoBehaviour
 {
     public BoxCollider2D actualBox;
-
 }
