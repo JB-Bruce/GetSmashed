@@ -2,7 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
+using static UnityEditor.Experimental.GraphView.GraphView;
 
 public class PlayerManager : MonoBehaviour
 {
@@ -34,17 +36,20 @@ public class PlayerManager : MonoBehaviour
         winCanvas.SetActive(false);
     }
 
-    public Color AddPlayer(PlayerController player)
+    public Color AddPlayer(PlayerController player, out string pName)
     {
         players.Add(player);
         GameObject newObject = Instantiate(objectFollowerPrefab);
 
         Color playerColor = playerColors[(players.Count - 1) % playerColors.Length];
 
-        newObject.GetComponent<ObjectFollow>().Init(player, playerColor, "Player " + (players.Count));
+        pName = "Player " + (players.Count);
+
+        newObject.GetComponent<ObjectFollow>().Init(player, playerColor, pName);
+        
 
         GameObject health = Instantiate(healthPrefab, playerHealthParent);
-        health.GetComponent<PlayerStats>().Init(player, "Player " + (players.Count), playerColor);
+        health.GetComponent<PlayerStats>().Init(player, pName, playerColor);
 
         foreach (var item in players)
         {
@@ -78,6 +83,8 @@ public class PlayerManager : MonoBehaviour
     {
         StartCoroutine(EWin());
         winCanvas.SetActive(true);
+        playerNameText.text = pc.playerName;
+        playerNameText.color = pc.playerColor;
     }
 
     IEnumerator EWin()

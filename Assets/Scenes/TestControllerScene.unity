@@ -520,10 +520,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
-    - target: {fileID: 1350938667834719135, guid: 130403ecf764b8546a9e1d7eec35e82f, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
+    - target: {fileID: 5293947314934882844, guid: 130403ecf764b8546a9e1d7eec35e82f, type: 3}
+      propertyPath: swordClip
+      value: 
+      objectReference: {fileID: 8300000, guid: 43b77c3f7dea7544e829056172406f7f, type: 3}
     - target: {fileID: 8441360557523431891, guid: 130403ecf764b8546a9e1d7eec35e82f, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

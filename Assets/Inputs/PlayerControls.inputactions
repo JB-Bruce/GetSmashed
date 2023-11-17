@@ -61,12 +61,12 @@
                 },
                 {
                     "name": "Emote",
-                    "type": "Button",
+                    "type": "Value",
                     "id": "c9b761df-ae1d-412e-a5f8-83527f915c86",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "Vector2",
                     "processors": "",
                     "interactions": "",
-                    "initialStateCheck": false
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -271,7 +271,7 @@
                 {
                     "name": "",
                     "id": "660d8bdb-04b5-4730-9b4c-4ce206a599a5",
-                    "path": "<Gamepad>/buttonEast",
+                    "path": "<Gamepad>/dpad",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -280,15 +280,59 @@
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "",
-                    "id": "90e96d98-d5c6-43f4-b11c-434f12626889",
+                    "name": "Keyboard",
+                    "id": "9f289e64-c134-450b-adbb-77725bbec638",
+                    "path": "2DVector(mode=1)",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Emote",
+                    "isComposite": true,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "up",
+                    "id": "15071956-344b-473f-8448-7c6760482378",
                     "path": "<Keyboard>/1",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardAndMouse",
                     "action": "Emote",
                     "isComposite": false,
-                    "isPartOfComposite": false
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "down",
+                    "id": "33d1709e-ae82-4aef-a8d2-1ecb1491ce5f",
+                    "path": "<Keyboard>/2",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardAndMouse",
+                    "action": "Emote",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "left",
+                    "id": "3c2a491b-4e8c-4437-99f7-152c9e28e1cf",
+                    "path": "<Keyboard>/3",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardAndMouse",
+                    "action": "Emote",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "right",
+                    "id": "42deb3ec-cc94-4663-93ab-2ec79f7bce1b",
+                    "path": "<Keyboard>/4",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardAndMouse",
+                    "action": "Emote",
+                    "isComposite": false,
+                    "isPartOfComposite": true
                 }
             ]
         },
