@@ -125,7 +125,7 @@ MonoBehaviour:
   timeLeftText: {fileID: 295431537998186881}
   startsInText: {fileID: 7452541050596996143}
   startAnimator: {fileID: 7381761867466387172}
-  startTime: 10
+  startTime: 15
 --- !u!1 &1186476938250051753
 GameObject:
   m_ObjectHideFlags: 0
