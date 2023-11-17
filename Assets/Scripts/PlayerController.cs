@@ -68,6 +68,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip swordClip;
     [SerializeField] AudioClip smashClip;
+    [SerializeField] AudioClip hitClip;
+    [SerializeField] AudioClip respawnClip;
 
     [SerializeField] BoxCollider2D swordCollider;
 
@@ -359,7 +361,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-
     public void TakeDamage(float damage, Vector2 direction, float newKnockback, float hitTime)
     {
         if (invincible)
@@ -390,6 +391,8 @@ public class PlayerController : MonoBehaviour
         dashing = false;
         dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         dashTimer = 0;
+
+        audioSource.PlayOneShot(hitClip);
 
         damageTaken += damage;
         rb.AddForce((direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * newKnockback)) + Vector2.up * baseUpKnockback, ForceMode2D.Impulse);
@@ -533,8 +536,6 @@ public class PlayerController : MonoBehaviour
         return attackList[0];
     }
 
-    
-
     public void Respawn()
     {
         if (invincible)
@@ -545,6 +546,8 @@ public class PlayerController : MonoBehaviour
             EndAttack();
             UpAnimator.SetTrigger("EndDownSmash");
         }
+
+        audioSource.PlayOneShot(respawnClip);
 
         invincible = true;
         Invoke("EndInvincibility", invincibleTime);
