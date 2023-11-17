@@ -65,6 +65,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] Animator bottomAnimator;
     [SerializeField] Animator UpAnimator;
 
+    [SerializeField] AudioSource audioSource;
+    [SerializeField] AudioClip swordClip;
+    [SerializeField] AudioClip smashClip;
+
     [SerializeField] BoxCollider2D swordCollider;
 
     [SerializeField] Transform collidersParent;
@@ -77,6 +81,10 @@ public class PlayerController : MonoBehaviour
 
     public UnityEvent takeDamageEvent;
     public UnityEvent dieEvent;
+
+    [SerializeField] LayerMask groundMask;
+
+    [SerializeField] float upSmashForce;
 
     public float damageTaken { get; private set; } = 0f;
 
@@ -102,6 +110,11 @@ public class PlayerController : MonoBehaviour
     bool isHit = false;
     float hitTimer = 0f;
 
+    float inputsDurationTimer;
+    bool emoting;
+
+    [SerializeField] ParticleSystem dashEffect;
+
     public bool isShielding { get; private set; } = false;
     float shieldLife;
     [SerializeField] float shieldMaxLife;
@@ -117,6 +130,16 @@ public class PlayerController : MonoBehaviour
 
     public PlayerPlatformeManager plat;
 
+    Gamepad playerGamepad;
+
+    public Color playerColor { get; private set; }
+    public string playerName { get; private set; }
+
+    bool emoteBot;
+    bool emoteTop;
+
+    PlayerInput pi;
+
 
     private void Start()
     {
@@ -126,7 +149,9 @@ public class PlayerController : MonoBehaviour
         rb.gravityScale = jumpingGravity;
         swordCollider.enabled = false;
 
-        Color c = PlayerManager.instance.AddPlayer(this);
+        Color c = PlayerManager.instance.AddPlayer(this, out string pName);
+
+        playerName = pName;
 
         shieldLife = shieldMaxLife;
 
@@ -136,10 +161,19 @@ public class PlayerController : MonoBehaviour
         stunGO.SetActive(false);
 
         SetColor(c);
+
+        pi = GetComponent<PlayerInput>();
+
+        if (pi != null)
+        {
+            playerGamepad = pi.devices[0] as Gamepad;
+        }
     }
 
     private void SetColor(Color c)
     {
+        playerColor = c;
+
         foreach (var item in tShirtParts)
         {
             item.color = c;
@@ -150,7 +184,7 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        RaycastHit2D hit = Physics2D.Raycast(feetPoint.position, Vector2.down, .1f);
+        RaycastHit2D hit = Physics2D.Raycast(feetPoint.position, Vector2.down, .1f, groundMask);
 
         float velX = rb.velocity.x;
 
@@ -210,7 +244,14 @@ public class PlayerController : MonoBehaviour
 
         if(hit.collider != null)
         {
-            if(!grounded)
+
+            if (currentAttack.AttackEnum == AttackEnum.DownSmash && swordCollider.enabled)
+            {
+                EndAttack();
+                UpAnimator.SetTrigger("EndDownSmash");
+            }
+
+            if (!grounded)
                 bottomAnimator.SetBool("StoppedJump", true);
 
             if(dashed && !dashing)
@@ -226,6 +267,32 @@ public class PlayerController : MonoBehaviour
         else
         {
             grounded = false;
+        }
+    }
+
+    private void LowVibration()
+    {
+        if(playerGamepad != null)
+        {
+            playerGamepad.SetMotorSpeeds(0, 1);
+            Invoke("StopVibrate", .2f);
+        }
+    }
+
+    private void HighVibration()
+    {
+        if (playerGamepad != null)
+        {
+            playerGamepad.SetMotorSpeeds(1, 1);
+            Invoke("StopVibrate", .2f);
+        }
+    }
+
+    private void StopVibrate()
+    {
+        if(playerGamepad != null)
+        {
+            playerGamepad.SetMotorSpeeds(0, 0);
         }
     }
 
@@ -245,7 +312,8 @@ public class PlayerController : MonoBehaviour
         }
 
 
-        rb.velocity = new(rb.velocity.x, Mathf.Clamp(rb.velocity.y, -maxFallSpeed, maxFallSpeed));
+        if(currentAttack.AttackEnum != AttackEnum.UpSmash)
+            rb.velocity = new(rb.velocity.x, Mathf.Clamp(rb.velocity.y, -maxFallSpeed, maxFallSpeed));
 
         if (isStunByAttack && currentAttack.slowMovementsOnAttack)
         {
@@ -262,6 +330,7 @@ public class PlayerController : MonoBehaviour
             if(dashTimer >= dashDuration)
             {
                 rb.gravityScale = baseGravity;
+                dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 dashing = false;
                 dashTimer = 0;
             }
@@ -277,8 +346,17 @@ public class PlayerController : MonoBehaviour
         if (movements.magnitude > inputsMinima)
         {
             rb.velocity = new(Mathf.Clamp(rb.velocity.x + movements.x * acceleration * Time.fixedDeltaTime, -maxSpeed, maxSpeed), rb.velocity.y);
-        }
+            inputsDurationTimer += Time.fixedDeltaTime;
 
+            if(inputsDurationTimer > .1f )
+            {
+                TryStopEmote();
+            }
+        }
+        else
+        {
+            inputsDurationTimer = 0f;
+        }
     }
 
 
@@ -295,6 +373,14 @@ public class PlayerController : MonoBehaviour
             hitTime += breakShieldStunTime;
         }
 
+        TryStopEmote();
+
+        if (damage > 10f)
+            HighVibration();
+        else
+            LowVibration();
+
+
         isHit = true;
         hitTimer += hitTime;
 
@@ -302,12 +388,27 @@ public class PlayerController : MonoBehaviour
 
         rb.gravityScale = baseGravity;
         dashing = false;
+        dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         dashTimer = 0;
 
         damageTaken += damage;
         rb.AddForce((direction * (baseKnockback + ((float)(1f / 10f) * damageTaken) * newKnockback)) + Vector2.up * baseUpKnockback, ForceMode2D.Impulse);
 
         takeDamageEvent.Invoke();
+    }
+
+    private void TryStopEmote()
+    {
+        if (emoting)
+        {
+            if(emoteTop)
+                UpAnimator.SetTrigger("StopEmote");
+
+            TryStopBotEmote();
+
+            emoteTop = false;
+            emoting = false;
+        }
     }
 
     public void Jump(bool startJump)
@@ -319,6 +420,9 @@ public class PlayerController : MonoBehaviour
         {
             if ((!grounded && Time.time - lastJump < doubleJumpIntervalMinima) || currentDoubleJumpAmount >= doubleJumpAmount)
                 return;
+
+            emoteBot = false;
+            TryStopEmote();
 
             if(!grounded)
                 currentDoubleJumpAmount++;
@@ -345,8 +449,11 @@ public class PlayerController : MonoBehaviour
     {
         if (movements.magnitude < inputsMinima || dashed || isStunByAttack || isHit || isShielding)
             return;
+
         if(Time.time - lastDashed > minimumDashInterval)
         {
+            dashEffect.Play();
+
             dashed = true;
             dashing = true;
             rb.gravityScale = 0f;
@@ -390,17 +497,18 @@ public class PlayerController : MonoBehaviour
 
             rb.gravityScale = baseGravity;
             dashing = false;
+            dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             dashTimer = 0;
 
             if(!enemyController.isShielding) 
             {
                 GameObject particle = Instantiate(hitParticlesPrefab, nearHit, Quaternion.identity);
-                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
+                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 180, 0));
             }
             else
             {
                 GameObject particle = Instantiate(shieldHitParticlesPrefab, nearHit, Quaternion.identity);
-                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
+                particle.transform.rotation = Quaternion.Euler(new Vector3(0, 180, 0));
             }
             
 
@@ -408,7 +516,8 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            Instantiate(wallHitParticlesPrefab, nearHit, Quaternion.identity);
+            GameObject go = Instantiate(wallHitParticlesPrefab, nearHit, Quaternion.identity);
+            go.transform.rotation = Quaternion.Euler(new Vector3(0, 180, 0));
         }
     }
 
@@ -431,6 +540,12 @@ public class PlayerController : MonoBehaviour
         if (invincible)
             return;
 
+        if (currentAttack.AttackEnum == AttackEnum.DownSmash && swordCollider.enabled)
+        {
+            EndAttack();
+            UpAnimator.SetTrigger("EndDownSmash");
+        }
+
         invincible = true;
         Invoke("EndInvincibility", invincibleTime);
 
@@ -439,7 +554,8 @@ public class PlayerController : MonoBehaviour
 
         lifes = Math.Clamp(lifes - 1, 0, 99);
         damageTaken = 0;
-        
+
+        PlayerManager.instance.Replace(this);
 
         dieEvent.Invoke();
 
@@ -455,12 +571,15 @@ public class PlayerController : MonoBehaviour
         }
 
         this.enabled = false;
+
+        PlayerManager.instance.Die(this);
     }
 
     public void StartAttack()
     {
         rb.gravityScale = baseGravity;
         dashing = false;
+        dashEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         dashTimer = 0;
 
         swordCollider.enabled = true;
@@ -471,6 +590,7 @@ public class PlayerController : MonoBehaviour
         attacking = false;
         swordCollider.enabled = false;
         playersHitted.Clear();
+        currentAttack = GetAttackFromEnum(AttackEnum.None);
     }
 
     private void Shield(bool start)
@@ -498,19 +618,105 @@ public class PlayerController : MonoBehaviour
         if (attacking || isStunByAttack || isShielding)
             return;
 
+        emoting = false;
+
+        TryStopBotEmote();
+
+        audioSource.PlayOneShot(swordClip);
+
         attacking = true;
         SetCurrentAttack(AttackEnum.Forward);
         UpAnimator.Play("ForwardAttack", 0, 0);
     }
 
+    private void TryStopBotEmote()
+    {
+        if (emoteBot)
+        {
+            emoteBot = false;
+            bottomAnimator.SetTrigger("StopEmote");
+        }
+    }
+
     public void Smash()
     {
-        if (attacking || isStunByAttack || !grounded || jumping || isShielding)
+        if (attacking || isStunByAttack || isShielding)
             return;
 
+        if (!grounded || jumping)
+        {
+            if(movements.y < 0f)
+            {
+                TryStopBotEmote();
+                attacking = true;
+
+                audioSource.PlayOneShot(smashClip);
+
+                SetCurrentAttack(AttackEnum.DownSmash);
+                UpAnimator.Play("DownSmash", 0, 0);
+            }
+
+            if(movements.y > 0f)
+            {
+                TryStopBotEmote();
+                attacking = true;
+
+                audioSource.PlayOneShot(smashClip);
+
+                rb.gravityScale = baseGravity;
+                rb.velocity = Vector2.zero;
+                rb.AddForce(new(0, upSmashForce), ForceMode2D.Impulse);
+                SetCurrentAttack(AttackEnum.UpSmash);
+                UpAnimator.Play("UpSmash", 0, 0);
+            }
+
+            return;
+        }
+
+        TryStopBotEmote();
         attacking = true;
-        SetCurrentAttack(AttackEnum.UpSmash);
-        UpAnimator.Play("UpSmash", 0, 0);
+
+        Vector2 newMovements = movements.normalized;
+
+        float northDist = Vector2.Distance(newMovements, Vector2.up);
+        float eastDist = Vector2.Distance(newMovements, Vector2.right);
+        float southDist = Vector2.Distance(newMovements, Vector2.down);
+        float westDist = Vector2.Distance(newMovements, Vector2.left);
+
+        float middleDist = newMovements.magnitude;
+
+
+        if (middleDist < 0.1f)
+        {
+            audioSource.PlayOneShot(smashClip);
+
+            SetCurrentAttack(AttackEnum.MiddleSmash);
+            UpAnimator.Play("MiddleSmash", 0, 0);
+        }
+        else if(northDist < southDist && northDist < eastDist && northDist < westDist)
+        {
+            audioSource.PlayOneShot(smashClip);
+
+            rb.gravityScale = baseGravity;
+            rb.velocity = Vector2.zero;
+            rb.AddForce(new(0, upSmashForce), ForceMode2D.Impulse);
+            SetCurrentAttack(AttackEnum.UpSmash);
+            UpAnimator.Play("UpSmash", 0, 0);
+        }
+        else if (southDist < eastDist && southDist < northDist && southDist < westDist)
+        {
+            audioSource.PlayOneShot(smashClip);
+
+            SetCurrentAttack(AttackEnum.DownSmash);
+            UpAnimator.Play("DownSmash", 0, 0);
+        }
+        else
+        {
+            audioSource.PlayOneShot(smashClip);
+
+            SetCurrentAttack(AttackEnum.ForwardSmash);
+            UpAnimator.Play("ForwardSmash", 0, 0);
+        }
     }
 
     private void SetCurrentAttack(AttackEnum newEnum)
@@ -523,6 +729,40 @@ public class PlayerController : MonoBehaviour
     private void EndInvincibility()
     {
         invincible = false;
+    }
+
+    private void Emote(int i)
+    {
+        if (attacking || isStunByAttack || !grounded || jumping || isShielding || isHit || emoting)
+            return;
+
+        
+
+        switch (i)
+        {
+            case 0:
+                emoting = true;
+                emoteTop = true;
+                emoteBot = true;
+
+                UpAnimator.Play("TopEmote2", 0, 0);
+                bottomAnimator.Play("BotEmote2", 0, 0);
+                break;
+            case 1:
+                emoting = true;
+                emoteTop = true;
+
+                UpAnimator.Play("TopEmote1", 0, 0);
+                break;
+            case 2:
+                break;
+            case 3:
+                break;
+            default:
+                break;
+
+        }
+        
     }
 
     public void OnMove(InputAction.CallbackContext ctx)
@@ -558,6 +798,27 @@ public class PlayerController : MonoBehaviour
         pressingShieldBtn = ctx.ReadValueAsButton();
         Shield(ctx.ReadValueAsButton());
     }
+
+    public void OnEmote(InputAction.CallbackContext ctx)
+    {
+        if (!ctx.performed)
+            return;
+
+        int emoteIndex = 0;
+
+        Vector2 dir = ctx.ReadValue<Vector2>();
+
+        if (dir.y == 1)
+            emoteIndex = 0;
+        else if (dir.y == -1)
+            emoteIndex = 1;
+        else if (dir.x == 1)
+            emoteIndex = 2;
+        else if (dir.x == -1)
+            emoteIndex = 3;
+
+        Emote(emoteIndex);
+    }
 }
 
 [System.Serializable]
@@ -567,5 +828,6 @@ public enum AttackEnum : uint
     Forward,
     UpSmash,
     DownSmash,
-    ForwardSmash
+    ForwardSmash,
+    MiddleSmash
 }
