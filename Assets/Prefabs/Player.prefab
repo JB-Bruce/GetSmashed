@@ -5350,8 +5350,10 @@ MonoBehaviour:
   bottomAnimator: {fileID: 329733499449894295}
   UpAnimator: {fileID: 4079556614659676367}
   audioSource: {fileID: 6113860439809886137}
-  swordClip: {fileID: 8300000, guid: be80da5ad7770684ba355ae0593a0da2, type: 3}
+  swordClip: {fileID: 8300000, guid: 43b77c3f7dea7544e829056172406f7f, type: 3}
   smashClip: {fileID: 8300000, guid: 8572c7e7c23e7b5429186a99cdc99166, type: 3}
+  hitClip: {fileID: 8300000, guid: 39d46fce71eb88147be126bcc734ba6f, type: 3}
+  respawnClip: {fileID: 8300000, guid: 06b856e24e24aef46af781ef6851a133, type: 3}
   swordCollider: {fileID: 5394301581620900978}
   collidersParent: {fileID: 4121820214434141018}
   hitParticlesPrefab: {fileID: 8645147184395638144, guid: ed4e92d880ddd64419e85b6edc1c0a87, type: 3}
